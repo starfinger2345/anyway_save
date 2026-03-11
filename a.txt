@@ -1,0 +1,10 @@
+
+
+
+usb-ROBOTIS_OpenRB-150_3E3B9675503059384C2E3120FF080A22-if00 - 리더
+
+usb-ROBOTIS_OpenRB-150_7E7FE4BC503059384C2E3120FF080E2D-if00 - 팔로워
+
+ros2 launch physical_ai_server omx_f_follower_ai.launch.py
+
+ros2 launch physical_ai_server omx_l_leader_ai.launch.py
