@@ -9,14 +9,19 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(Qt6 REQUIRED Widgets Core Gui)
 find_package(nav2_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -41,8 +46,13 @@ ament_target_dependencies(final_project
     geometry_msgs
     sensor_msgs
     nav2_msgs
+    tf2_geometry_msgs
+    tf2
+    tf2_ros
+    nav_msgs
     cv_bridge
     image_transport
+    std_srvs
 )
 
 target_link_libraries(final_project
