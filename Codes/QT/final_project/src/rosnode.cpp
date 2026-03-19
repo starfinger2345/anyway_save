@@ -5,7 +5,7 @@ RosNode::RosNode(QWidget *parent)
     : QWidget{parent}
 {
     msg_twist = geometry_msgs::msg::Twist();
-    rclcpp::init(0, nullptr);
+
     node_teleop = rclcpp::Node::make_shared("qt_node");
     pub_teleop = node_teleop->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
     pub_lift = node_teleop->create_publisher<std_msgs::msg::Int32>("/cmd_lift", 10);
@@ -16,22 +16,11 @@ RosNode::RosNode(QWidget *parent)
         "/image_out/compressed", 10, std::bind(&RosNode::ImageSubCallbackFunc, this, _1));
     sub_point = node_teleop->create_subscription<geometry_msgs::msg::Point>(
         "/point_out", 10, std::bind(&RosNode::PointSubCallbackFunc, this, _1));
-    sub_map = node_teleop->create_subscription<nav_msgs::msg::OccupancyGrid>(
-        "/map", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local(),
-        std::bind(&RosNode::MapSubCallbackFunc, this, std::placeholders::_1));
     sub_joy = node_teleop->create_subscription<sensor_msgs::msg::Joy>(
         "/joy", 10, std::bind(&RosNode::JoySubCallbackFunc, this, std::placeholders::_1));
-
-    pQTimer = new QTimer(this);
-    connect(pQTimer, &QTimer::timeout, this, &RosNode::OnTimerCallbackFunc);
-    pQTimer->start(50);
-    tf_buffer = std::make_shared<tf2_ros::Buffer>(node_teleop->get_clock());
-    tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
-    client_pause = node_teleop->create_client<std_srvs::srv::Empty>("/slam_toolbox/pause_new_measurements");
 }
 RosNode::~RosNode() {
     rclcpp::shutdown();
-    delete pQTimer;
 }
 
 void RosNode::ImageSubCallbackFunc(sensor_msgs::msg::CompressedImage::SharedPtr msg) {
@@ -61,14 +50,7 @@ void RosNode::BatterySubCallbackFunc(sensor_msgs::msg::BatteryState::SharedPtr p
         battery_update_count = 0;
     }
 }
-void RosNode::MapSubCallbackFunc(nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
-    emit mapReceivedSig(msg);
-}
 
-void RosNode::OnTimerCallbackFunc()
-{
-    rclcpp::spin_some(node_teleop);
-}
 void RosNode::RunTeleopPublisher(double linearX, double angularZ)
 {
     msg_twist.linear.x = linearX;
@@ -123,21 +105,4 @@ void RosNode::JoySubCallbackFunc(const sensor_msgs::msg::Joy::SharedPtr msg)
 
         last_lift_input = lift_input;
     }
-}
-
-geometry_msgs::msg::Pose RosNode::getRobotPose() {
-    geometry_msgs::msg::Pose cur_pos;
-    try {
-        auto transform = tf_buffer->lookupTransform("map", "base_footprint", tf2::TimePointZero);
-        cur_pos.position.x = transform.transform.translation.x;
-        cur_pos.position.y = transform.transform.translation.y;
-        cur_pos.orientation = transform.transform.rotation;
-    } catch (tf2::TransformException &e) {
-        RCLCPP_ERROR(node_teleop->get_logger(), "Could not transform map to base_footprint: %s", e.what());
-    }
-    return cur_pos;
-}
-void RosNode::pauseSlam() {
-    auto request = std::make_shared<std_srvs::srv::Empty::Request>();
-    client_pause->async_send_request(request);
 }

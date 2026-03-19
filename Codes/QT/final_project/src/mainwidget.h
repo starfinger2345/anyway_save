@@ -7,7 +7,10 @@
 #include <QPainter>
 #include <QQueue>
 #include <QResizeEvent>
+#include <QPixmap>
+#include <QLabel>
 #include "rosnode.h"
+#include "mapnode.h"
 #include "map_callback.h"
 #include "pose_callback.h"
 
@@ -62,7 +65,6 @@ private slots:
     void updatePointSlot(geometry_msgs::msg::Point p);
     void updateMapSlot(nav_msgs::msg::OccupancyGrid::SharedPtr msg);
 
-    void on_pushButton_clicked();
     void on_PB_return_clicked();
     void on_PB_pause_clicked();
     void on_PB_ping_clicked();
@@ -79,17 +81,20 @@ private slots:
     void on_PB_lift_up_released();
     void on_PB_lift_down_pressed();
     void on_PB_lift_down_released();
+    void updateHumanPoseSlot(geometry_msgs::msg::Point p);
 
+
+    void on_pushButton_clicked();
 
 private:
     Ui::MainWidget *ui;
     QTimer *updateTimer;
     RosNode *ros_node;
+    MapNode* map_node;
     QTimer* on_checkTimer;
     QTimer *liftTimer;
     double battery_prev;
     int lift_angle = 2048;
-    int lift_state = 1;
     float linear_vel;
     float angular_vel;
     KalmanFilter filter{0.001f, 0.1f, 100.0f};
@@ -101,16 +106,17 @@ private:
     int width, height;
     QElapsedTimer fps_timer;
     double current_fps = 0.0;
-    const QList<int> lift_step = {2350, 2048, 1888, 1728, 1568, 1408, 1248};
     SlamState slam_state = SlamState::MAPPING;
     BtnState btn_state;
     geometry_msgs::msg::Point estimated_person_pos;
     bool is_person_estimated = false;
-    double map_res = 0.05;
-    double map_origin_x = 0.0;
-    double map_origin_y = 0.0;
-    int map_width = 0;
-    int map_height = 0;
+    QLabel* lbl_robot_icon;
+    QLabel* lbl_ping_icon;
+    QPixmap robot_raw;
+    QPixmap ping_raw;
+
+    std::thread ros_thread_;
+    std::thread map_thread_;
 
 
 protected:

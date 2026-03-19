@@ -1,6 +1,7 @@
 #include "mainwidget.h"
 #include "ui_mainwidget.h"
 #include <QDateTime>
+#include <thread>
 
 MainWidget::MainWidget(QWidget *parent)
     : QWidget(parent)
@@ -26,7 +27,6 @@ MainWidget::MainWidget(QWidget *parent)
         ui->QDT->setDateTime(QDateTime::currentDateTime());
         current_fps = frame_count;
         frame_count = 0;
-        // drawMap();
     });
     updateTimer->start(1000);
     ui->QDT->setDateTime(QDateTime::currentDateTime());
@@ -37,16 +37,18 @@ MainWidget::MainWidget(QWidget *parent)
 
     liftTimer = new QTimer(this);
     connect(liftTimer, &QTimer::timeout, this, &MainWidget::increaseValue);
-    liftTimer->start(200);
+    liftTimer->start(250);
 
     ui->PBAR_battery->setValue(0);
 
     // Rosnode slot
     ros_node = new RosNode(this);
+    map_node = new MapNode(this);
     connect(ros_node, &RosNode::batteryPercentSig, this, &MainWidget::updateBatterySlot);
     connect(ros_node, &RosNode::imageReceivedSig, this, &MainWidget::updateCameraSlot);
     connect(ros_node, &RosNode::pointReceivedSig, this, &MainWidget::updatePointSlot);
-    connect(ros_node, &RosNode::mapReceivedSig, this, &MainWidget::updateMapSlot);
+    connect(map_node, &MapNode::mapReceivedSig, this, &MainWidget::updateMapSlot);
+    connect(map_node, &MapNode::pointReceivedSig, this, &MainWidget::updateHumanPoseSlot);
     connect(ros_node, &RosNode::joyLiftUpSig, this, [=](bool pressed) {
         btn_state.lift_up = pressed;
     });
@@ -59,9 +61,6 @@ MainWidget::MainWidget(QWidget *parent)
         ui->QL_top_icon->setPixmap(pix.scaled(iconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation));
         ui->QL_top_icon->setFixedSize(iconSize);
     }
-
-    // lift / vel initialize
-    lift_state = 1;
     // ui->L_lift_state_1->setStyleSheet("background-color: #FFD966; border: 1px solid grey; border-radius: 5px;");
     ui->label_2->setText("Linear: " + QString::number(linear_vel, 'f', 2));
     ui->label_3->setText("Linear: " + QString::number(angular_vel, 'f', 1));
@@ -71,11 +70,36 @@ MainWidget::MainWidget(QWidget *parent)
     clahe->setTilesGridSize(cv::Size(8,8));
     width = -1;
     height = -1;
+
+    robot_raw = QPixmap(":/new/prefix1/robot.png").scaled(30, 30, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    ping_raw = QPixmap(":/new/prefix1/top_bar_icon.png").scaled(30, 30, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    lbl_robot_icon = new QLabel(ui->QL_map);
+    lbl_robot_icon->setPixmap(robot_raw);
+    lbl_robot_icon->setFixedSize(30, 30);
+    lbl_robot_icon->setAttribute(Qt::WA_TranslucentBackground);
+    lbl_robot_icon->hide();
+
+    lbl_ping_icon = new QLabel(ui->QL_map);
+    lbl_ping_icon->setPixmap(ping_raw);
+    lbl_ping_icon->setFixedSize(30, 30);
+    lbl_ping_icon->setAttribute(Qt::WA_TranslucentBackground);
+    lbl_ping_icon->hide();
+
+    ros_thread_ = std::thread([this]() {
+        rclcpp::spin(ros_node->getNode());
+    });
+
+    map_thread_ = std::thread([this]() {
+        rclcpp::spin(map_node->getNode());
+    });
 }
 
 MainWidget::~MainWidget()
 {
     delete ui;
+    if (ros_thread_.joinable()) ros_thread_.join();
+    if (map_thread_.joinable()) map_thread_.join();
 }
 
 // Update UI slots
@@ -170,8 +194,12 @@ void MainWidget::updateMapSlot(const nav_msgs::msg::OccupancyGrid::SharedPtr msg
     double origin_x = msg->info.origin.position.x;
     double origin_y = msg->info.origin.position.y;
 
-    QImage map_image(width, height, QImage::Format_RGB32);
+    double map_res = map_node->map_res;
+    double map_origin_x = map_node->map_origin_x;
+    double map_origin_y = map_node->map_origin_y;
+    int map_height = map_node->map_height;
 
+    QImage map_image(width, height, QImage::Format_RGB32);
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int i = x + (height - 1 - y) * width;
@@ -185,74 +213,78 @@ void MainWidget::updateMapSlot(const nav_msgs::msg::OccupancyGrid::SharedPtr msg
             map_image.setPixel(x, y, color);
         }
     }
-    auto robot_pos = ros_node->getRobotPose();
-    int robot_px = (robot_pos.position.x - origin_x) / res;
-    int robot_py = height - ((robot_pos.position.y - origin_y) / res);
-    QPainter painter(&map_image);
-    painter.setBrush(Qt::red);
-    painter.setPen(Qt::NoPen);
-    painter.drawEllipse(QPoint(robot_px, robot_py), 3, 3);
-
-    if (is_person_estimated) {
-        int person_px = (estimated_person_pos.x - map_origin_x) / map_res;
-        int person_py = map_height - ((estimated_person_pos.y - map_origin_y) / map_res);
-
-        painter.setBrush(Qt::blue);
-        painter.setPen(QPen(Qt::black, 1));
-        painter.drawEllipse(QPoint(person_px, person_py), 5, 5);
-    }
 
     ui->QL_map->setPixmap(QPixmap::fromImage(map_image).scaled(
         ui->QL_map->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    double scale_factor = qMin((double)ui->QL_map->width() / width, (double)ui->QL_map->height() / height);
+    int offset_x = (ui->QL_map->width() - qRound(width * scale_factor)) / 2;
+    int offset_y = (ui->QL_map->height() - qRound(height * scale_factor)) / 2;
+
+    auto robot_pos = map_node->getRobotPose();
+    int robot_px = qRound((robot_pos.position.x - origin_x) / res);
+    int robot_py = height - qRound((robot_pos.position.y - origin_y) / res);
+
+    int ui_robot_x = qRound(robot_px * scale_factor) + offset_x;
+    int ui_robot_y = qRound(robot_py * scale_factor) + offset_y;
+
+    double qz = robot_pos.orientation.z;
+    double qw = robot_pos.orientation.w;
+    double ryaw = 2.0 * atan2(qz, qw);
+    double degrees = ryaw * 180.0 / M_PI - 90.0;
+
+    QTransform transform;
+    transform.rotate(-degrees);
+    QPixmap rotated_robot = robot_raw.transformed(transform, Qt::SmoothTransformation);
+
+    lbl_robot_icon->setPixmap(rotated_robot);
+    lbl_robot_icon->setFixedSize(rotated_robot.size());
+    lbl_robot_icon->move(ui_robot_x - (rotated_robot.width() / 2),
+                         ui_robot_y - (rotated_robot.height() / 2));
+    lbl_robot_icon->show();
+    lbl_robot_icon->raise();
+
+    if (is_person_estimated) {
+        int person_px = qRound((estimated_person_pos.x - map_origin_x) / map_res);
+        int person_py = map_height - qRound((estimated_person_pos.y - map_origin_y) / map_res);
+
+        int ui_person_x = qRound(person_px * scale_factor) + offset_x;
+        int ui_person_y = qRound(person_py * scale_factor) + offset_y;
+
+        lbl_ping_icon->move(ui_person_x - (lbl_ping_icon->width() / 2),
+                            ui_person_y - (lbl_ping_icon->height() / 2));
+        lbl_ping_icon->show();
+        lbl_ping_icon->raise();
+    } else {
+        lbl_ping_icon->hide();
+    }
+}
+void MainWidget::updateHumanPoseSlot(geometry_msgs::msg::Point p) {
+    auto robot_pose = map_node->getRobotPose();
+    double rx = robot_pose.position.x;
+    double ry = robot_pose.position.y;
+    double qz = robot_pose.orientation.z;
+    double qw = robot_pose.orientation.w;
+    double ryaw = 2.0 * atan2(qz, qw);
+
+    double distance = p.x;
+    double relative_yaw = p.y;
+
+    estimated_person_pos.x = rx + distance * cos(ryaw - relative_yaw);
+    estimated_person_pos.y = ry + distance * sin(ryaw - relative_yaw);
+
+    is_person_estimated = true;
+    qDebug() << "Ping! Person at: " << estimated_person_pos.x << ", " << estimated_person_pos.y;
 }
 
 // /cmd_lift controll slots
-// void MainWidget::on_PB_lift_stop_clicked()
-// {
-//     lift_angle = 2048;
-//     ros_node->RunLiftPublisher(lift_angle);
-//     this->setStateColor(lift_angle);
-// }
-
-// Lift UI update function
-// void MainWidget::setStateColor(int angle) {
-//     for(int i = 6; i >= 0; i--) {
-//         if (angle <= lift_step[i]) {
-//             lift_state = i;
-//             break;
-//         }
-//     }
-//     ui->L_lift_state_0->setStyleSheet("background-color: #F2F4F1; border: 1px solid grey; border-radius: 5px;");
-//     ui->L_lift_state_1->setStyleSheet("background-color: #F2F4F1; border: 1px solid grey; border-radius: 5px;");
-//     ui->L_lift_state_2->setStyleSheet("background-color: #F2F4F1; border: 1px solid grey; border-radius: 5px;");
-//     ui->L_lift_state_3->setStyleSheet("background-color: #F2F4F1; border: 1px solid grey; border-radius: 5px;");
-//     ui->L_lift_state_4->setStyleSheet("background-color: #F2F4F1; border: 1px solid grey; border-radius: 5px;");
-//     ui->L_lift_state_5->setStyleSheet("background-color: #F2F4F1; border: 1px solid grey; border-radius: 5px;");
-//     ui->L_lift_state_6->setStyleSheet("background-color: #F2F4F1; border: 1px solid grey; border-radius: 5px;");
-//     switch (lift_state) {
-//     case 0:
-//         ui->L_lift_state_0->setStyleSheet("background-color: #FF4340; border: 1px solid grey; border-radius: 5px;");
-//         break;
-//     case 1:
-//         ui->L_lift_state_1->setStyleSheet("background-color: #FFD966; border: 1px solid grey; border-radius: 5px;");
-//         break;
-//     case 2:
-//         ui->L_lift_state_2->setStyleSheet("background-color: #04EB84; border: 1px solid grey; border-radius: 5px;");
-//         break;
-//     case 3:
-//         ui->L_lift_state_3->setStyleSheet("background-color: #04EB84; border: 1px solid grey; border-radius: 5px;");
-//         break;
-//     case 4:
-//         ui->L_lift_state_4->setStyleSheet("background-color: #04EB84; border: 1px solid grey; border-radius: 5px;");
-//         break;
-//     case 5:
-//         ui->L_lift_state_5->setStyleSheet("background-color: #04EB84; border: 1px solid grey; border-radius: 5px;");
-//         break;
-//     case 6:
-//         ui->L_lift_state_6->setStyleSheet("background-color: #04EB84; border: 1px solid grey; border-radius: 5px;");
-//         break;
-//     }
-// }
+void MainWidget::on_PB_lift_stop_clicked()
+{
+    lift_angle = 2048;
+    ros_node->RunLiftPublisher(lift_angle);
+    ui->S_lift_state->setValue(lift_angle);
+    ui->LB_lift_state->setText(QString::number(lift_angle));
+}
 
 // /cmd_vel control slots
 void MainWidget::on_PB_arrow_up_pressed() { btn_state.vel_up = true; }
@@ -345,10 +377,6 @@ void MainWidget::keyReleaseEvent(QKeyEvent *event) {
     }
 }
 
-void MainWidget::on_pushButton_clicked()
-{
-    ros_node->RunPointPublisher(x, y);
-}
 void MainWidget::on_PB_return_clicked()
 {
     return;
@@ -358,12 +386,12 @@ void MainWidget::on_PB_pause_clicked()
     if (slam_state == SlamState::MAPPING) {
         ui->PB_pause->setText("RESTART");
         slam_state = SlamState::PAUSED;
-        ros_node->pauseSlam();
+        map_node->pauseSlam();
     }
     else {
         ui->PB_pause->setText("STOP");
         slam_state = SlamState::MAPPING;
-        ros_node->pauseSlam();
+        map_node->pauseSlam();
     }
 }
 void MainWidget::handleTimeout() {
@@ -399,15 +427,15 @@ void MainWidget::increaseValue() {
     }
 
     // cmd_lift
-    if (btn_state.lift_up && lift_angle > 1104) {
-        lift_angle -= 10;
+    if (btn_state.lift_up && lift_angle > 1149) {
+        lift_angle -= 50;
         ros_node->RunLiftPublisher(lift_angle);
         // setStateColor(lift_angle);
         ui->S_lift_state->setValue(lift_angle);
         ui->LB_lift_state->setText(QString::number(lift_angle));
     }
-    if (btn_state.lift_down && lift_angle < 2346) {
-        lift_angle += 10;
+    if (btn_state.lift_down && lift_angle < 2301) {
+        lift_angle += 50;
         ros_node->RunLiftPublisher(lift_angle);
         // setStateColor(lift_angle);
         ui->S_lift_state->setValue(lift_angle);
@@ -422,21 +450,10 @@ void MainWidget::increaseValue() {
 }
 
 void MainWidget::on_PB_ping_clicked() {
-    auto robot_pose = ros_node->getRobotPose();
-    double rx = robot_pose.position.x;
-    double ry = robot_pose.position.y;
+    ros_node->RunPointPublisher(ros_node->human_point.x, ros_node->human_point.y);
+}
 
-    double qz = robot_pose.orientation.z;
-    double qw = robot_pose.orientation.w;
-    double robot_yaw = 2.0 * atan2(qz, qw);
-
-    double distance = ros_node->human_point.x;
-    double relative_yaw = ros_node->human_point.y;
-
-    estimated_person_pos.x = rx + distance * cos(robot_yaw + relative_yaw);
-    estimated_person_pos.y = ry + distance * sin(robot_yaw + relative_yaw);
-
-    is_person_estimated = true;
-
-    qDebug() << "Ping! Person at: " << estimated_person_pos.x << ", " << estimated_person_pos.y;
+void MainWidget::on_pushButton_clicked()
+{
+    close();
 }
