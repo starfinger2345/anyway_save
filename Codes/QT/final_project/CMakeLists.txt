@@ -40,6 +40,8 @@ add_executable(final_project
 	src/rosnode.cpp
 	src/rosnode.h
         icon.qrc
+        src/mapnode.h
+        src/mapnode.cpp
 )
 ament_target_dependencies(final_project
     rclcpp

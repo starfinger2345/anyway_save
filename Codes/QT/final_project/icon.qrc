@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/new/prefix1">
         <file>top_bar_icon.png</file>
+		<file>robot.png</file>
     </qresource>
 </RCC>
