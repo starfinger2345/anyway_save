@@ -46,7 +46,7 @@ MainWidget::MainWidget(QWidget *parent)
     map_node = new MapNode(this);
     connect(ros_node, &RosNode::batteryPercentSig, this, &MainWidget::updateBatterySlot);
     connect(ros_node, &RosNode::imageReceivedSig, this, &MainWidget::updateCameraSlot);
-    connect(ros_node, &RosNode::pointReceivedSig, this, &MainWidget::updatePointSlot);
+    connect(ros_node, &RosNode::peopleReceivedSig, this, &MainWidget::updatePeopleSlot);
     connect(map_node, &MapNode::mapReceivedSig, this, &MainWidget::updateMapSlot);
     connect(map_node, &MapNode::pointReceivedSig, this, &MainWidget::updateHumanPoseSlot);
     connect(ros_node, &RosNode::joyLiftUpSig, this, [=](bool pressed) {
@@ -157,14 +157,28 @@ void MainWidget::updateCameraSlot(QImage img) {
     }
 
     if (point_update) {
-        int px = static_cast<int>(width * x);
-        int py = static_cast<int>(height * y);
-        QPainter painter_point(&depth_img);
-        painter_point.setRenderHint(QPainter::Antialiasing);
-        painter_point.setPen(QPen(Qt::blue, 5));
-        painter_point.setBrush(Qt::blue);
-        painter_point.drawEllipse(QPoint(px, py), 3, 3);
-        painter_point.end();
+        int num_people = ros_node->people_points.people.size();
+        for (int i = 0; i < num_people; i++) {
+            custom_interfaces::msg::Person person = ros_node->people_points.people[i];
+            int px = static_cast<int>(width * person.x);
+            int py = static_cast<int>(height * person.y);
+            QPainter painter_point(&depth_img);
+            painter_point.setRenderHint(QPainter::Antialiasing);
+            if (person.state > 1.5 && person.state < 2.5) {
+                painter_point.setPen(QPen(Qt::red, 10));
+                painter_point.setBrush(Qt::red);
+            }
+
+            else if (person.state > 0.5 && person.state < 1.5) {
+                painter_point.setPen(QPen(Qt::blue, 10));
+                painter_point.setBrush(Qt::blue);
+            }
+			else {
+				continue;
+			}
+            painter_point.drawEllipse(QPoint(px, py), 3, 3);
+            painter_point.end();
+        }
     }
 
     ui->QL_depth_camera->setPixmap(QPixmap::fromImage(depth_img).scaled(
@@ -181,11 +195,12 @@ void MainWidget::updateCameraSlot(QImage img) {
     ui->QL_omx_camera->setPixmap(QPixmap::fromImage(webcam_img).scaled(
         ui->QL_omx_camera->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 }
-void MainWidget::updatePointSlot(geometry_msgs::msg::Point p) {
-    if (p.x < 0 || p.y < 0) point_update = 0;
+void MainWidget::updatePeopleSlot(custom_interfaces::msg::People p) {
+    if (p.people.size() == 0) point_update = 0;
     else point_update = 1;
-    x = p.x;
-    y = p.y;
+    x = p.people[0].x;
+    y = p.people[0].y;
+	state = p.people[0].state;
 }
 void MainWidget::updateMapSlot(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
     int width = msg->info.width;
@@ -450,10 +465,26 @@ void MainWidget::increaseValue() {
 }
 
 void MainWidget::on_PB_ping_clicked() {
-    ros_node->RunPointPublisher(ros_node->human_point.x, ros_node->human_point.y);
+	int num_people = ros_node->people_points.people.size();
+	if (num_people == 0) return;
+	for (int i = 0; i < num_people; i++) {
+		if (ros_node->people_points.people[i].state > 1.5) {
+			ros_node->RunPointPublisher(ros_node->people_points.people[i].x, ros_node->people_points.people[i].y);
+			return;
+		}
+	}
 }
 
 void MainWidget::on_pushButton_clicked()
 {
     close();
+}
+
+void MainWidget::on_PB_marker_clicked()
+{
+    ui->PB_marker->setEnabled(false);
+    ros_node->RunDispenserPublisher();
+    QTimer::singleShot(2000, this, [=]() {
+        ui->PB_marker->setEnabled(true);
+    });
 }

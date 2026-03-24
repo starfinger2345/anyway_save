@@ -11,8 +11,6 @@
 #include <QLabel>
 #include "rosnode.h"
 #include "mapnode.h"
-#include "map_callback.h"
-#include "pose_callback.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -59,10 +57,11 @@ public:
 private slots:
     void on_PB_arrow_stop_clicked();
     void on_PB_lift_stop_clicked();
+    void on_PB_marker_clicked();
 
     void updateBatterySlot(double percentage);
     void updateCameraSlot(QImage img);
-    void updatePointSlot(geometry_msgs::msg::Point p);
+    void updatePeopleSlot(custom_interfaces::msg::People p);
     void updateMapSlot(nav_msgs::msg::OccupancyGrid::SharedPtr msg);
 
     void on_PB_return_clicked();
@@ -102,7 +101,7 @@ private:
     int battery_update = 0;
     int point_update = 0;
     int frame_count = 0;
-    float x, y;
+    float x, y, state;
     int width, height;
     QElapsedTimer fps_timer;
     double current_fps = 0.0;

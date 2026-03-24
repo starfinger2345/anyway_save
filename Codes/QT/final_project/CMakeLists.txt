@@ -17,11 +17,13 @@ find_package(Qt6 REQUIRED Widgets Core Gui)
 find_package(nav2_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(custom_interfaces REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -53,8 +55,10 @@ ament_target_dependencies(final_project
     tf2_ros
     nav_msgs
     cv_bridge
+    custom_interfaces
     image_transport
     std_srvs
+    ament_index_cpp
 )
 
 target_link_libraries(final_project

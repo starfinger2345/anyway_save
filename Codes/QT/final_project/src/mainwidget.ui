@@ -3176,7 +3176,7 @@ font: 600 13pt &quot;A2Z&quot;;</string>
              </widget>
             </item>
             <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="15,2">
+             <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="15,0">
               <item>
                <widget class="QLabel" name="QL_map">
                 <property name="sizePolicy">
@@ -3194,7 +3194,7 @@ font: 600 13pt &quot;A2Z&quot;;</string>
                </widget>
               </item>
               <item>
-               <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,0,0">
+               <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,0,0,0">
                 <item>
                  <widget class="QPushButton" name="PB_return">
                   <property name="sizePolicy">
@@ -3264,6 +3264,30 @@ border-color: rgba(191, 64, 64, 0);</string>
                   </property>
                   <property name="text">
                    <string>PING</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="PB_marker">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>20</width>
+                    <height>30</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">background-color: rgb(59, 56, 56);
+color: rgb(242, 244, 241);
+border-color: rgba(191, 64, 64, 0);</string>
+                  </property>
+                  <property name="text">
+                   <string>MARKER</string>
                   </property>
                  </widget>
                 </item>

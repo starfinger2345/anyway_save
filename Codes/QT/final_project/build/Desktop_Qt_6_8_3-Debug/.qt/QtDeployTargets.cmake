@@ -1,2 +1,0 @@
-set(__QT_DEPLOY_TARGET_final_project_FILE /home/ubuntu/project_ws/src/final_project/build/Desktop_Qt_6_8_3-Debug/final_project)
-set(__QT_DEPLOY_TARGET_final_project_TYPE EXECUTABLE)

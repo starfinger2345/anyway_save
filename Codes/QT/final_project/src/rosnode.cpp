@@ -14,15 +14,21 @@ RosNode::RosNode(QWidget *parent)
         "/battery_state", 10, std::bind(&RosNode::BatterySubCallbackFunc, this, _1));
     sub_image = node_teleop->create_subscription<sensor_msgs::msg::CompressedImage>(
         "/image_out/compressed", 10, std::bind(&RosNode::ImageSubCallbackFunc, this, _1));
-    sub_point = node_teleop->create_subscription<geometry_msgs::msg::Point>(
-        "/point_out", 10, std::bind(&RosNode::PointSubCallbackFunc, this, _1));
+    sub_people = node_teleop->create_subscription<custom_interfaces::msg::People>(
+        "/point_out", 10, std::bind(&RosNode::PeopleSubCallbackFunc, this, _1));
     sub_joy = node_teleop->create_subscription<sensor_msgs::msg::Joy>(
         "/joy", 10, std::bind(&RosNode::JoySubCallbackFunc, this, std::placeholders::_1));
+    pub_dispenser = node_teleop->create_publisher<std_msgs::msg::Empty>("/dispenser_trigger", 10);
 }
 RosNode::~RosNode() {
     rclcpp::shutdown();
 }
-
+void RosNode::RunDispenserPublisher()
+{
+    auto msg = std_msgs::msg::Empty();
+    RCLCPP_INFO(node_teleop->get_logger(), "Sending dispenser trigger signal...");
+    pub_dispenser->publish(msg);
+}
 void RosNode::ImageSubCallbackFunc(sensor_msgs::msg::CompressedImage::SharedPtr msg) {
     try {
         cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
@@ -37,10 +43,17 @@ void RosNode::ImageSubCallbackFunc(sensor_msgs::msg::CompressedImage::SharedPtr 
         RCLCPP_ERROR(node_teleop->get_logger(), "Could not convert from '%s' to 'bgr8'.", msg->format.c_str());
     }
 }
-void RosNode::PointSubCallbackFunc (geometry_msgs::msg::Point::SharedPtr msg) {
-    human_point.x = msg->x;
-    human_point.y = msg->y;
-    emit pointReceivedSig(human_point);
+void RosNode::PeopleSubCallbackFunc (custom_interfaces::msg::People::SharedPtr msg) {
+    int num_people = msg->people.size();
+	people_points.people.clear();
+    if (num_people == 0) return;
+    else {
+        for (int i = 0; i < num_people; i++) {
+            people_points.people.insert(people_points.people.end(), msg->people[i]);
+        }
+        emit peopleReceivedSig(people_points);
+    }
+
 }
 void RosNode::BatterySubCallbackFunc(sensor_msgs::msg::BatteryState::SharedPtr pmsg) {
     static int battery_update_count = 0;
@@ -67,9 +80,10 @@ void RosNode::RunLiftPublisher(int angle)
 }
 void RosNode::RunPointPublisher(float x, float y) {
     RCLCPP_INFO(node_teleop->get_logger(), "Sending depth request with point: (%.2f, %.2f)", x, y);
-    human_point.x = x;
-    human_point.y = y;
-    pub_point->publish(human_point);
+    geometry_msgs::msg::Point point;
+	point.x = x;
+	point.y = y;
+    pub_point->publish(point);
 }
 
 void RosNode::JoySubCallbackFunc(const sensor_msgs::msg::Joy::SharedPtr msg)

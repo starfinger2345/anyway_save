@@ -39,7 +39,7 @@ public:
     void PointSubCallbackFunc(geometry_msgs::msg::Point::SharedPtr msg);
     geometry_msgs::msg::Pose getRobotPose();
     void pauseSlam();
-    rclcpp::Node::SharedPtr getNode() { return node_map; };
+    rclcpp::Node::SharedPtr getNode() { return node_map; }
 
 signals:
     void batteryPercentSig(double percent);
