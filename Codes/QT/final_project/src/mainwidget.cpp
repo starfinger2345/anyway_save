@@ -37,7 +37,7 @@ MainWidget::MainWidget(QWidget *parent)
 
     liftTimer = new QTimer(this);
     connect(liftTimer, &QTimer::timeout, this, &MainWidget::increaseValue);
-    liftTimer->start(250);
+    liftTimer->start(50);
 
     ui->PBAR_battery->setValue(0);
 
@@ -63,11 +63,8 @@ MainWidget::MainWidget(QWidget *parent)
     }
     // ui->L_lift_state_1->setStyleSheet("background-color: #FFD966; border: 1px solid grey; border-radius: 5px;");
     ui->label_2->setText("Linear: " + QString::number(linear_vel, 'f', 2));
-    ui->label_3->setText("Linear: " + QString::number(angular_vel, 'f', 1));
+    ui->label_3->setText("Angular: " + QString::number(angular_vel, 'f', 1));
 
-    clahe = cv::createCLAHE();
-    clahe->setClipLimit(2.0);
-    clahe->setTilesGridSize(cv::Size(8,8));
     width = -1;
     height = -1;
 
@@ -144,13 +141,6 @@ void MainWidget::updateCameraSlot(QImage img) {
 
     cv::Mat depth_mat(height, single_width, CV_8UC3, (void*)depth_img.bits(), depth_img.bytesPerLine());
     cv::medianBlur(depth_mat, depth_mat, 3);
-    cv::Mat lab;
-    cv::cvtColor(depth_mat, lab, cv::COLOR_BGR2Lab);
-    std::vector<cv::Mat> lab_planes;
-    cv::split(lab, lab_planes);
-    clahe->apply(lab_planes[0], lab_planes[0]);
-    cv::merge(lab_planes, lab);
-    cv::cvtColor(lab, depth_mat, cv::COLOR_Lab2BGR);
     if (width < 0) {
         width = depth_img.width();
         height = depth_img.height();
@@ -302,14 +292,30 @@ void MainWidget::on_PB_lift_stop_clicked()
 }
 
 // /cmd_vel control slots
-void MainWidget::on_PB_arrow_up_pressed() { btn_state.vel_up = true; }
-void MainWidget::on_PB_arrow_up_released() { btn_state.vel_up = false; }
-void MainWidget::on_PB_arrow_left_pressed() { btn_state.vel_left = true; }
-void MainWidget::on_PB_arrow_left_released() { btn_state.vel_left = false; }
-void MainWidget::on_PB_arrow_right_pressed() { btn_state.vel_right = true; }
-void MainWidget::on_PB_arrow_right_released() { btn_state.vel_right = false; }
-void MainWidget::on_PB_arrow_down_pressed() { btn_state.vel_down = true; }
-void MainWidget::on_PB_arrow_down_released() { btn_state.vel_down = false; }
+void MainWidget::on_PB_arrow_up_pressed() {
+    if (linear_vel < 0.22) linear_vel += 0.01;
+    ros_node->RunTeleopPublisher(linear_vel, angular_vel);
+    ui->label_2->setText("Linear: " + QString::number(linear_vel, 'f', 2));
+}
+void MainWidget::on_PB_arrow_up_released() { return; }
+void MainWidget::on_PB_arrow_left_pressed() {
+    if (angular_vel > -1.8) angular_vel -= 0.1;
+    ros_node->RunTeleopPublisher(linear_vel, angular_vel);
+    ui->label_3->setText("Angular: " + QString::number(angular_vel, 'f', 1));
+}
+void MainWidget::on_PB_arrow_left_released() { return; }
+void MainWidget::on_PB_arrow_right_pressed() {
+    if (angular_vel < 1.8) angular_vel += 0.1;
+    ros_node->RunTeleopPublisher(linear_vel, angular_vel);
+    ui->label_3->setText("Angular: " + QString::number(angular_vel, 'f', 1));
+}
+void MainWidget::on_PB_arrow_right_released() { return; }
+void MainWidget::on_PB_arrow_down_pressed() {
+    if (linear_vel > -0.22) linear_vel -= 0.01;
+    ros_node->RunTeleopPublisher(linear_vel, angular_vel);
+    ui->label_2->setText("Linear: " + QString::number(linear_vel, 'f', 2));
+}
+void MainWidget::on_PB_arrow_down_released() { return; }
 void MainWidget::on_PB_lift_up_pressed() { btn_state.lift_up = true; }
 void MainWidget::on_PB_lift_up_released() { btn_state.lift_up = false; }
 void MainWidget::on_PB_lift_down_pressed() { btn_state.lift_down = true; }
@@ -319,7 +325,7 @@ void MainWidget::on_PB_arrow_stop_clicked()
     linear_vel = 0.0;
     angular_vel = 0.0;
     ui->label_2->setText("Linear: " + QString::number(linear_vel, 'f', 2));
-    ui->label_3->setText("Linear: " + QString::number(angular_vel, 'f', 1));
+    ui->label_3->setText("Angular: " + QString::number(angular_vel, 'f', 1));
     ros_node->RunTeleopPublisher(linear_vel, angular_vel);
 }
 
@@ -422,45 +428,20 @@ void MainWidget::handleTimeout() {
     );
 }
 void MainWidget::increaseValue() {
-    // cmd_vel
-    bool changed = false; // cmd_vel change check
-    if (btn_state.vel_up && linear_vel < 0.22) {
-        linear_vel += 0.01;
-        changed = true;
-    }
-    if (btn_state.vel_down && linear_vel > -0.22) {
-        linear_vel -= 0.01;
-        changed = true;
-    }
-    if (btn_state.vel_left && angular_vel < 1.8) {
-        angular_vel += 0.1;
-        changed = true;
-    }
-    if (btn_state.vel_right && angular_vel > -1.8) {
-        angular_vel -= 0.1;
-        changed = true;
-    }
-
     // cmd_lift
-    if (btn_state.lift_up && lift_angle > 1149) {
-        lift_angle -= 50;
+    if (btn_state.lift_up && lift_angle > 1114) {
+        lift_angle -= 15;
         ros_node->RunLiftPublisher(lift_angle);
         // setStateColor(lift_angle);
         ui->S_lift_state->setValue(lift_angle);
         ui->LB_lift_state->setText(QString::number(lift_angle));
     }
-    if (btn_state.lift_down && lift_angle < 2301) {
-        lift_angle += 50;
+    if (btn_state.lift_down && lift_angle < 2336) {
+        lift_angle += 15;
         ros_node->RunLiftPublisher(lift_angle);
         // setStateColor(lift_angle);
         ui->S_lift_state->setValue(lift_angle);
         ui->LB_lift_state->setText(QString::number(lift_angle));
-    }
-
-    if (changed) {
-        ui->label_2->setText("Linear: " + QString::number(linear_vel, 'f', 2));
-        ui->label_3->setText("Angular: " + QString::number(angular_vel, 'f', 1));
-        ros_node->RunTeleopPublisher(linear_vel, angular_vel);
     }
 }
 

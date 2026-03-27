@@ -81,8 +81,6 @@ private slots:
     void on_PB_lift_down_pressed();
     void on_PB_lift_down_released();
     void updateHumanPoseSlot(geometry_msgs::msg::Point p);
-
-
     void on_pushButton_clicked();
 
 private:
@@ -97,7 +95,6 @@ private:
     float linear_vel;
     float angular_vel;
     KalmanFilter filter{0.001f, 0.1f, 100.0f};
-    cv::Ptr<cv::CLAHE> clahe;
     int battery_update = 0;
     int point_update = 0;
     int frame_count = 0;
