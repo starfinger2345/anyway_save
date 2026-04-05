@@ -1,0 +1,3 @@
+#!/bin/sh
+unset NODE_OPTIONS
+ELECTRON_RUN_AS_NODE=1 "/home/turtlebot100/.vscode-server/cli/servers/Stable-0870c2a0c7c0564e7631bfed2675573a94ba4455/server/node" "/home/turtlebot100/.vscode-server/data/User/globalStorage/github.copilot-chat/debugCommand/copilotDebugCommand.js" "vscode://github.copilot-chat" "code --openExternal " "$@"

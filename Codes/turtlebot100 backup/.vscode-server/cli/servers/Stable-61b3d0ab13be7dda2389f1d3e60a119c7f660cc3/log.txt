@@ -1,0 +1,33 @@
+*
+* Visual Studio Code Server
+*
+* By using the software, you agree to
+* the Visual Studio Code Server License Terms (https://aka.ms/vscode-server-license) and
+* the Microsoft Privacy Statement (https://privacy.microsoft.com/en-US/privacystatement).
+*
+Server bound to /tmp/code-6d8d254e-ff99-4580-b37b-6b7a93dc1162
+Extension host agent listening on /tmp/code-6d8d254e-ff99-4580-b37b-6b7a93dc1162
+
+[09:26:48] 
+
+
+
+
+[reconnection-grace-time] No CLI argument provided, using default: 10800000ms (10800s)
+[09:26:48] Extension host agent started.
+[09:26:49] [<unknown>][7a294b54][ExtensionHostConnection] New connection established.
+[09:26:49] [<unknown>][a60fcecd][ManagementConnection] New connection established.
+[09:26:52] [<unknown>][7a294b54][ExtensionHostConnection] <1583> Launched Extension Host Process.
+[09:26:54] [<unknown>][7a294b54][ExtensionHostConnection] <1583> [reconnection-grace-time] Extension host: read VSCODE_RECONNECTION_GRACE_TIME=10800000ms (10800s)
+
+[09:27:27] [<unknown>][a60fcecd][ManagementConnection] The client has disconnected gracefully, so the connection will be disposed.
+[09:27:27] [<unknown>][7a294b54][ExtensionHostConnection] <1583> Extension Host Process exited with code: 0, signal: null.
+Cancelling previous shutdown timeout
+[09:27:27] Cancelling previous shutdown timeout
+Last EH closed, waiting before shutting down
+[09:27:27] Last EH closed, waiting before shutting down
+[09:27:32] [<unknown>][64b41ec4][ExtensionHostConnection] New connection established.
+[09:27:32] [<unknown>][64b41ec4][ExtensionHostConnection] <1732> Launched Extension Host Process.
+[09:27:32] [<unknown>][c5a97091][ManagementConnection] New connection established.
+[09:27:34] [<unknown>][64b41ec4][ExtensionHostConnection] <1732> [reconnection-grace-time] Extension host: read VSCODE_RECONNECTION_GRACE_TIME=10800000ms (10800s)
+

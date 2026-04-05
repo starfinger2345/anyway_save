@@ -1,0 +1,3 @@
+let g:netrw_dirhistmax  =10
+let g:netrw_dirhistcnt =1
+let g:netrw_dirhist_1='/home/turtlebot100/.ros/log/2026-03-18-17-16-44-038416-turtlebot100-1361'
